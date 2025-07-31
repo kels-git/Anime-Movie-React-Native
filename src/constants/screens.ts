@@ -4,10 +4,8 @@ export enum SCREENS {
   WELCOME = 'Welcome',
   HOME = 'Home',
   DETAILS = 'Details',
-  AIRING = 'Airing',
   COMPLETE = 'Complete',
   ANIME_LISTING = 'Anime Listing',
   DRAWER_NAVIGATOR = 'Drawer',
-  UPCOMING = 'Upcoming',
   FAVOURITE = 'Favourite',
 }

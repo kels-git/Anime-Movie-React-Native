@@ -6,7 +6,6 @@ import {
   IndexDetailAnimeContainer,
   IndexWelcomeAnimeContainer,
 } from '../container';
-import {BottomNavigationBar} from './bottom-bar-stack';
 import DrawerNavigator from './drawer-stack';
 import {NavigationProp} from '@react-navigation/native';
 
@@ -35,12 +34,6 @@ export const PrivateStack: React.FC<NavigationProps> = ({}) => {
         options={{
           animation: 'slide_from_right',
         }}
-      />
-
-      <Stack.Screen
-        name={SCREENS.HOME_STACK}
-        component={BottomNavigationBar}
-        options={{}}
       />
 
       <Stack.Screen

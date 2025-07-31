@@ -6,7 +6,6 @@ import {
   IndexListingAnimeContainer,
 } from '../container';
 import {StackParams} from '../typings/navigation';
-import {BottomNavigationBar} from './bottom-bar-stack';
 
 const Drawer = createDrawerNavigator<StackParams>();
 
@@ -26,10 +25,6 @@ const DrawerNavigator = () => {
       <Drawer.Screen
         name={SCREENS.FAVOURITE}
         component={IndexFavouriteAnimeContainer}
-      />
-      <Drawer.Screen
-        name={SCREENS.HOME_STACK}
-        component={BottomNavigationBar}
       />
     </Drawer.Navigator>
   );
