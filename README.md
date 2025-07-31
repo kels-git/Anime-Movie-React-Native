@@ -68,5 +68,5 @@ npm install --legacy-peer-deps
   <img src="./screenshots/listing.jpeg" width="200" />
   <img src="./screenshots/detail.jpeg" width="200" />
    <img src="./screenshots/favorites.jpeg" width="200" />
-</div>
 
+</div>
