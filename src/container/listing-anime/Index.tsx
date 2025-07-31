@@ -1,192 +1,165 @@
-import React, {useEffect, useState} from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   ActivityIndicator,
   TouchableOpacity,
-  TextInput,
+  RefreshControl,
 } from 'react-native';
-import {ContainerWrapper} from '../../components/wrapper';
-import {useTailwind} from 'tailwind-rn';
-import {AnimeCardComponent, ResponsiveUi} from '../../components';
-import {RootStackScreenProps} from '../../typings/navigation';
-import {SCREENS} from '../../constants/screens';
-import useAnimeList from '../useAnimeList';
-import {Anime} from '../../typings/Anime';
-import {useDispatch, useSelector} from 'react-redux';
-import {addAnimeDetailDisplay} from '../../../store-features/animeDetails/animeDetailsSlice';
-import {useQueryClient} from 'react-query';
-import {
-  addToFavorites,
-  removeFromFavorites,
-} from '../../../store-features/animeFavorite/animeFavoruiteSlice';
-import {RootState} from '../../../store/rootReducer';
+import { ContainerWrapper } from '../../components/wrapper';
+import { useTailwind } from 'tailwind-rn';
+import { AnimeCardComponent, ResponsiveUi } from '../../components';
+import { RootStackScreenProps } from '../../typings/navigation';
+import { SCREENS } from '../../constants/screens';
+import { Anime, AnimeListResponse } from '../../typings/Anime';
+import { APIHelperService } from '../../services/api-helper-service';
+import GenreFilter from '../../components/filter/genre-filter';
+import { COLORS } from '../../constants/colors';
+import { MetricsSizes } from '../../helper/variables';
 
-const IndexListingAnimeContainer = ({
-  route,
-  navigation,
-}: RootStackScreenProps<SCREENS.COMPLETE>) => {
+const IndexListingAnimeContainer = ({ navigation }: RootStackScreenProps<SCREENS.ANIME_LISTING>) => {
   const tailwind = useTailwind();
-  const dispatch = useDispatch();
-  const queryClient = useQueryClient();
-  const {data, fetchNextPage, isLoading, isError, hasNextPage} = useAnimeList();
-  const [fetchFirstPage, setFetchFirstPage] = useState(false);
-  const selectedFavorites = useSelector(
-    (state: RootState) => state.animeFavoruiteSlice.selectedFavorites,
-  );
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [animeList, setAnimeList] = useState<Anime[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasNextPage, setHasNextPage] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedGenre, setSelectedGenre] = useState<number | null>(null);
 
-  const handleAnimeApi = (item: Anime) => {
-    console.log('details item--', typeof item);
-    dispatch(addAnimeDetailDisplay(item));
-    navigation.navigate(SCREENS.MAIN_STACK, {screen: SCREENS.DETAILS});
-  };
+  const fetchAnime = useCallback(async (page: number, append: boolean = false) => {
+    try {
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+        setError(null);
+      }
+
+      const response: AnimeListResponse = await APIHelperService.fetchAnimeList(page, 10, selectedGenre ? selectedGenre.toString() : undefined);
+
+      console.log('Fetched anime data:', response.data);
+
+      if (append) {
+        setAnimeList(prev => [...prev, ...response.data]);
+      } else {
+        setAnimeList(response.data);
+      }
+
+      setHasNextPage(response.pagination.has_next_page);
+      setCurrentPage(page);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error in fetchAnime:', err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, [selectedGenre]);
+
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasNextPage) {
+      console.log('Loading more anime, page:', currentPage + 1);
+      fetchAnime(currentPage + 1, true);
+    }
+  }, [currentPage, hasNextPage, loadingMore, fetchAnime]);
+
+  const refresh = useCallback(() => {
+    console.log('Refreshing anime list');
+    setCurrentPage(1);
+    fetchAnime(1, false);
+  }, [fetchAnime]);
 
   useEffect(() => {
-    let timerId: NodeJS.Timeout | null = null;
+    console.log('Initial anime load');
+    fetchAnime(1);
+  }, [fetchAnime]);
 
-    if (fetchFirstPage) {
-      // Set a timer to delay fetching the next page by 30 seconds
-      timerId = setTimeout(() => {
-        fetchNextPage();
-        setFetchFirstPage(false); // Reset firstPage after initial fetch
-      }, 20000); // 20 seconds delay (in milliseconds)
-    }
-    // Clean up the timer and cancel ongoing API calls when the component is unmounted
-    return () => {
-      if (timerId) {
-        clearTimeout(timerId);
-      }
-      // Optionally cancel ongoing API calls here
-      // Cancel ongoing queries associated with the screen
-      queryClient.cancelQueries('animeList');
-    };
-  }, [fetchFirstPage, fetchNextPage]);
-
-  const handleToggleFavorite = (item: Anime) => {
-    if (isFavorite(item)) {
-      dispatch(removeFromFavorites(item));
-    } else {
-      dispatch(addToFavorites(item));
-    }
-  };
-
-  const isFavorite = (item: Anime) => {
-    return selectedFavorites.some(favItem => favItem.title === item.title);
-  };
-
-  const filteredData = searchQuery
-    ? data?.pages
-        ?.flatMap(page => page?.data)
-        ?.filter(item =>
-          item.title.toLowerCase().includes(searchQuery.toLowerCase()),
-        )
-    : data?.pages?.flatMap(page => page?.data);
-
-  const renderAnimeItem = ({item}: {item: Anime}) => {
-    // const isFavorite = selectedFavorites.find(favItem => favItem.title === item.title);
-    // const handleToggleFavorite = (item: Anime) => {
-
-    //   if (isFavorite) {
-    //     dispatch(removeFromFavorites(item));
-    //     setSelectedFavorites(prevFavorites => prevFavorites.filter(favItem => favItem.title !== item.title));
-    //   } else {
-    //     dispatch(addToFavorites(item));
-    //     setSelectedFavorites(prevFavorites => [...prevFavorites, item]);
-    //   }
-    // };
-
-    return (
-      <AnimeCardComponent
-        item={item}
-        handleAnimeClick={() => handleAnimeApi(item)}
-        favoriteName={isFavorite(item) ? 'favorite' : 'favorite-outline'}
-        toggleFavourite={() => handleToggleFavorite(item)}
-      />
-    );
-  };
-
-  useEffect(() => {});
-
-  const handleLoadMore = () => {
-    if (hasNextPage) {
-      fetchNextPage();
-    }
-  };
-
-  const handleReload = () => {
-    fetchNextPage();
-  };
-
-  if (isLoading && !data) {
-    return (
-      <ContainerWrapper
-        style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-        <ActivityIndicator size="large" color="blue" />
-      </ContainerWrapper>
-    );
-  }
-
-  if (isError) {
-    return (
-      <ContainerWrapper
-        style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-        <ResponsiveUi.Text>Error fetching anime data</ResponsiveUi.Text>
-        <TouchableOpacity onPress={handleReload}>
-          <ResponsiveUi.Text style={{color: 'blue', marginTop: 10}}>
-            Tap to reload
-          </ResponsiveUi.Text>
-        </TouchableOpacity>
-      </ContainerWrapper>
-    );
-  }
+  const availableGenres = useMemo(() => {
+    const allGenres = animeList.flatMap(anime => anime.genres || []);
+    return Array.from(new Map(allGenres.map(g => [g.mal_id, g])).values());
+  }, [animeList]);
 
   const renderFooter = () => {
+    if (!loadingMore) return null;
+
     return (
-      <ContainerWrapper style={{alignItems: 'center', marginTop: 20}}>
-        {isLoading ? (
-          <ActivityIndicator size="large" color="blue" />
-        ) : (
-          <ResponsiveUi.Text style={{fontSize: 16, color: '#000'}}>
-            {!hasNextPage ? (
-              'No more data'
-            ) : (
-              <ActivityIndicator size="large" color="blue" />
-            )}
-          </ResponsiveUi.Text>
-        )}
+      <ContainerWrapper style={[tailwind('p-4 items-center'), {}]}>
+        <ActivityIndicator size="small" color="#0066cc" />
+        <ResponsiveUi.Text color={'#586069'} style={[tailwind('mt-3')]}>Loading more...</ResponsiveUi.Text>
       </ContainerWrapper>
     );
   };
 
+  const renderEmpty = () => {
+    if (loading) {
+      return (
+        <ContainerWrapper style={[tailwind('flex-1 justify-center items-center p-3'), {}]}>
+          <ActivityIndicator size="large" color="#0066cc" />
+          <ResponsiveUi.Text color={'#586069'} style={[tailwind('mt-3')]}>Loading anime...</ResponsiveUi.Text>
+        </ContainerWrapper>
+      );
+    }
+
+    if (error) {
+      return (
+        <ContainerWrapper style={[tailwind('flex-1 justify-center items-center p-3'), {}]}>
+          <ResponsiveUi.Text color={'#d73a49'} style={[tailwind('mb-4 text-center'), {}]}>{error}</ResponsiveUi.Text>
+          <TouchableOpacity style={{
+            backgroundColor: '#0066cc',
+            paddingHorizontal: MetricsSizes.regular + 1,
+            paddingVertical: MetricsSizes.small - 2,
+            borderRadius: MetricsSizes.tiny - 1,
+          }} onPress={refresh}>
+            <ResponsiveUi.Text tailwind='font-semibold' color={COLORS.WHITE} style={{}}>Retry</ResponsiveUi.Text>
+          </TouchableOpacity>
+        </ContainerWrapper>
+      );
+    }
+
+    return null;
+  }
+
+  const handleAnimeClick = (item: Anime) => {
+    console.log('Anime clicked:', item);
+    navigation.navigate(SCREENS.DETAILS, { animeDetails: item });
+  }
+
+
   return (
-    <ContainerWrapper style={[tailwind('ml-3 mr-3'), {}]}>
-      <ContainerWrapper style={{marginTop: 3}}>
-        <TextInput
-          style={{
-            height: 35,
-            borderColor: 'gray',
-            borderWidth: 1,
-            borderRadius: 20,
-            paddingLeft: 10,
-          }}
-          placeholder="Search anime..."
-          onChangeText={text => setSearchQuery(text)}
-          value={searchQuery}
-        />
-      </ContainerWrapper>
+    <ContainerWrapper style={[tailwind('flex-1'), { backgroundColor: COLORS.BACKGROUND }]}>
+
+      <GenreFilter
+        selectedGenre={selectedGenre}
+        onSelectGenre={setSelectedGenre}
+        availableGenres={availableGenres}
+      />
 
       <FlatList
-        data={filteredData}
-        renderItem={renderAnimeItem}
-        keyExtractor={(_item, index) => index.toString()}
-        contentContainerStyle={[tailwind(''), {paddingHorizontal: 10}]}
-        showsVerticalScrollIndicator={false}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
+        data={animeList}
+        keyExtractor={(item: any) => item?.mal_id.toString()}
+        renderItem={({ item }) => (
+          <AnimeCardComponent
+            item={item}
+            handleAnimeClick={handleAnimeClick}
+          />
+        )}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.1}
         ListFooterComponent={renderFooter}
+        ListEmptyComponent={renderEmpty}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={refresh}
+            colors={['#0066cc']}
+          />
+        }
       />
     </ContainerWrapper>
-  );
+  )
 };
 
 export default IndexListingAnimeContainer;
+
+
